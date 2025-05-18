@@ -1,0 +1,101 @@
+<%- include ../partials/header %> <%- include ../partials/categories-navbar %>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-8 m-auto">
+      <h1 class="mt-4 mb-4">Shopping Cart</h1>
+      <div id="cart-content">Loading cart...</div>
+      <div id="cart-action-message" class="alert mt-3" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function fetchCart() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = '/user/signin';
+    return;
+  }
+  try {
+    const response = await fetch('/cart/data', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!data.success || !data.items || data.items.length === 0) {
+      document.getElementById('cart-content').innerHTML = '<div class="alert alert-info">Your cart is empty</div>';
+      return;
+    }
+    // Render cart items
+    let html = `<div class="table-responsive"><table class="table"><thead><tr><th>Product</th><th>Price</th><th>Quantity</th><th>Total</th><th>Actions</th></tr></thead><tbody>`;
+    data.items.forEach(item => {
+      html += `<tr>
+        <td><img src="${item.imagePath}" alt="" style="max-width:50px;max-height:50px;"> ${item.title}</td>
+        <td>$${(item.price/item.qty).toFixed(2)}</td>
+        <td>${item.qty}</td>
+        <td>$${item.price.toFixed(2)}</td>
+        <td>
+          <button class="btn btn-sm btn-warning reduce-item" data-id="${item.productId}">Reduce</button>
+          <button class="btn btn-sm btn-danger remove-item" data-id="${item.productId}">Remove All</button>
+        </td>
+      </tr>`;
+    });
+    html += `</tbody><tfoot><tr><td colspan="3" class="text-right"><strong>Total:</strong></td><td><strong>$${data.cart.totalCost.toFixed(2)}</strong></td><td></td></tr></tfoot></table></div>`;
+    html += `<div class="row"><div class="col-md-6"><a href="/" class="btn btn-primary">Continue Shopping</a></div><div class="col-md-6 text-right"><a href="/checkout" class="btn btn-success">Proceed to Checkout</a></div></div>`;
+    document.getElementById('cart-content').innerHTML = html;
+    addCartActionHandlers();
+  } catch (error) {
+    document.getElementById('cart-content').innerHTML = 'Error loading cart.';
+  }
+}
+
+function addCartActionHandlers() {
+  document.querySelectorAll('.reduce-item').forEach(button => {
+    button.addEventListener('click', async function() {
+      const productId = this.dataset.id;
+      await cartAction(`/reduce/${productId}`);
+    });
+  });
+  document.querySelectorAll('.remove-item').forEach(button => {
+    button.addEventListener('click', async function() {
+      const productId = this.dataset.id;
+      await cartAction(`/removeAll/${productId}`);
+    });
+  });
+}
+
+async function cartAction(url) {
+  const token = localStorage.getItem('token');
+  const msgDiv = document.getElementById('cart-action-message');
+  if (!token) {
+    window.location.href = '/user/signin';
+    return;
+  }
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (data.success) {
+      msgDiv.textContent = 'Cart updated successfully!';
+      msgDiv.className = 'alert alert-success mt-3';
+      msgDiv.style.display = 'block';
+      if (window.updateCartBadge) window.updateCartBadge();
+      fetchCart();
+    } else {
+      msgDiv.textContent = data.message || 'Error updating cart.';
+      msgDiv.className = 'alert alert-danger mt-3';
+      msgDiv.style.display = 'block';
+    }
+  } catch (error) {
+    msgDiv.textContent = 'Error updating cart.';
+    msgDiv.className = 'alert alert-danger mt-3';
+    msgDiv.style.display = 'block';
+  }
+}
+
+fetchCart();
+</script>
+
+<%- include ../partials/footer %>

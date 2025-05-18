@@ -1,0 +1,347 @@
+<%- include ../partials/header %> <%- include ../partials/categories-navbar %>
+
+<div class="container mt-4 mb-5">
+  <div class="row">
+    <!-- Checkout form -->
+    <div class="col-md-8">
+      <form id="checkout-form">
+        <!-- Shipping Address -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>Shipping Address</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="street">Street Address</label>
+                  <input type="text" id="street" name="street" class="form-control" required />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="city">City</label>
+                  <input type="text" id="city" name="city" class="form-control" required />
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="state">State</label>
+                  <input type="text" id="state" name="state" class="form-control" required />
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-group">
+                  <label for="country">Country</label>
+                  <input type="text" id="country" name="country" class="form-control" required />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shipping Method -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>Shipping Method</h5>
+          </div>
+          <div class="card-body" id="shipping-methods">
+            Loading shipping methods...
+          </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="card mb-4">
+          <div class="card-header">
+            <h5>Payment Method</h5>
+          </div>
+          <div class="card-body">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="paymentMethod" id="cashRadio" value="cash" checked>
+              <label class="form-check-label" for="cashRadio">Cash</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="paymentMethod" id="visaRadio" value="visa">
+              <label class="form-check-label" for="visaRadio">Visa</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Visa/Card Section -->
+        <div id="visa-section" style="display: none;">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5>Card Information</h5>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="card-number">Card Number</label>
+                <input type="text" id="card-number" class="form-control" placeholder="4242 4242 4242 4242" />
+                <div id="card-number-error" class="text-danger small mt-1" style="display:none;"></div>
+              </div>
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="card-expiry">Expiry Date</label>
+                    <input type="text" id="card-expiry" class="form-control" placeholder="MM/YY" />
+                    <div id="card-expiry-error" class="text-danger small mt-1" style="display:none;"></div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="card-cvc">CVC</label>
+                    <input type="text" id="card-cvc" class="form-control" placeholder="123" />
+                    <div id="card-cvc-error" class="text-danger small mt-1" style="display:none;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button id="submit-btn" type="submit" class="btn btn-dark button-style">
+          Place Order
+        </button>
+        <div id="checkout-message" class="alert mt-3" style="display:none"></div>
+      </form>
+    </div>
+
+    <!-- Order Summary -->
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h5>Order Summary</h5>
+        </div>
+        <div class="card-body" id="order-summary">
+          Loading order summary...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const cashRadio = document.getElementById('cashRadio');
+const visaRadio = document.getElementById('visaRadio');
+const visaSection = document.getElementById('visa-section');
+function toggleVisaSection() {
+  if (visaRadio.checked) {
+    visaSection.style.display = 'block';
+  } else {
+    visaSection.style.display = 'none';
+  }
+}
+cashRadio.addEventListener('change', toggleVisaSection);
+visaRadio.addEventListener('change', toggleVisaSection);
+toggleVisaSection();
+
+async function loadCheckoutData() {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = '/user/signin';
+    return;
+  }
+  // Load cart data
+  const cartRes = await fetch('/cart/data', { headers: { 'Authorization': `Bearer ${token}` } });
+  const cartData = await cartRes.json();
+  if (!cartData.success || !cartData.items || cartData.items.length === 0) {
+    document.getElementById('order-summary').innerHTML = '<div class="alert alert-info">Your cart is empty</div>';
+    document.getElementById('checkout-form').style.display = 'none';
+    return;
+  }
+  // Render order summary
+  let summaryHtml = '';
+  cartData.items.forEach(item => {
+    summaryHtml += `<div class="d-flex justify-content-between mb-2">
+      <span>${item.title} x ${item.qty}</span>
+      <span>$${item.price.toFixed(2)}</span>
+    </div>`;
+  });
+  summaryHtml += `<hr>
+    <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span>$${cartData.cart.totalCost.toFixed(2)}</span></div>
+    <div class="d-flex justify-content-between mb-2"><span>Shipping</span><span id="shipping-cost">$0.00</span></div>
+    <div class="d-flex justify-content-between mb-2"><span>Tax</span><span id="tax-amount">$0.00</span></div>
+    <hr>
+    <div class="d-flex justify-content-between"><strong>Total</strong><strong id="total-amount">$${cartData.cart.totalCost.toFixed(2)}</strong></div>`;
+  document.getElementById('order-summary').innerHTML = summaryHtml;
+
+  // Load shipping methods
+  const shippingRes = await fetch('/shipping/methods', { headers: { 'Authorization': `Bearer ${token}` } });
+  const shippingData = await shippingRes.json();
+  if (!shippingData.success || !shippingData.methods) {
+    document.getElementById('shipping-methods').innerHTML = '<div class="alert alert-danger">Could not load shipping methods.</div>';
+    return;
+  }
+  let shippingHtml = '';
+  shippingData.methods.forEach((method, idx) => {
+    shippingHtml += `<div class="form-check mb-2">
+      <input class="form-check-input shipping-method" type="radio" name="shippingMethod" id="shipping${method._id}" value="${method._id}" data-price="${method.price}" data-delivery="${method.deliveryTime}" ${idx === 0 ? 'checked' : ''} required>
+      <label class="form-check-label" for="shipping${method._id}">${method.name} - $${method.price} (${method.deliveryTime})</label>
+    </div>`;
+  });
+  document.getElementById('shipping-methods').innerHTML = shippingHtml;
+
+  // Update order summary totals when shipping method changes
+  document.querySelectorAll('.shipping-method').forEach(radio => {
+    radio.addEventListener('change', updateOrderSummaryTotals);
+  });
+  updateOrderSummaryTotals();
+}
+
+function updateOrderSummaryTotals() {
+  const cartSubtotal = parseFloat(document.querySelector('.order-items') ? document.querySelector('.order-items').dataset.subtotal : document.getElementById('order-summary').querySelectorAll('span')[1].textContent.replace('$',''));
+  const selectedShipping = document.querySelector('input[name="shippingMethod"]:checked');
+  const shippingCost = selectedShipping ? parseFloat(selectedShipping.dataset.price) : 0;
+  // Get address fields
+  const country = document.getElementById('country').value.trim().toUpperCase();
+  const state = document.getElementById('state').value.trim().toUpperCase();
+  // Tax rates must match backend logic
+  const TAX_RATES = {
+    US: { CA: 0.095, NY: 0.088, TX: 0.0825, DEFAULT: 0.08 },
+    EG: { DEFAULT: 0.14 },
+    DE: { DEFAULT: 0.19 },
+    DEFAULT: 0.08
+  };
+  function getTaxRate(country, state) {
+    if (TAX_RATES[country]) {
+      if (state && TAX_RATES[country][state]) return TAX_RATES[country][state];
+      if (TAX_RATES[country].DEFAULT) return TAX_RATES[country].DEFAULT;
+    }
+    return TAX_RATES.DEFAULT;
+  }
+  const taxRate = getTaxRate(country, state);
+  const taxAmount = cartSubtotal * taxRate;
+  const total = cartSubtotal + shippingCost + taxAmount;
+  document.getElementById('shipping-cost').textContent = `$${shippingCost.toFixed(2)}`;
+  document.getElementById('tax-amount').textContent = `$${taxAmount.toFixed(2)}`;
+  document.getElementById('total-amount').textContent = `$${total.toFixed(2)}`;
+}
+
+// Add listeners to address fields for dynamic tax/shipping
+['country','state'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateOrderSummaryTotals);
+});
+
+function setFieldError(input, errorDiv, message) {
+  input.classList.add('is-invalid');
+  input.style.borderColor = '#dc3545';
+  errorDiv.textContent = message;
+  errorDiv.style.display = 'block';
+}
+function clearFieldError(input, errorDiv) {
+  input.classList.remove('is-invalid');
+  input.style.borderColor = '';
+  errorDiv.textContent = '';
+  errorDiv.style.display = 'none';
+}
+function validateCardNumber() {
+  const input = document.getElementById('card-number');
+  const errorDiv = document.getElementById('card-number-error');
+  const value = input.value.replace(/\s/g, '');
+  if (!/^\d{16}$/.test(value)) {
+    setFieldError(input, errorDiv, 'Card number must be 16 digits.');
+    return false;
+  } else {
+    clearFieldError(input, errorDiv);
+    return true;
+  }
+}
+function validateCardExpiry() {
+  const input = document.getElementById('card-expiry');
+  const errorDiv = document.getElementById('card-expiry-error');
+  const value = input.value.trim();
+  if (!/^\d{2}\/\d{2}$/.test(value)) {
+    setFieldError(input, errorDiv, 'Expiry must be in MM/YY format.');
+    return false;
+  } else {
+    clearFieldError(input, errorDiv);
+    return true;
+  }
+}
+function validateCardCvc() {
+  const input = document.getElementById('card-cvc');
+  const errorDiv = document.getElementById('card-cvc-error');
+  const value = input.value.trim();
+  if (!/^\d{3}$/.test(value)) {
+    setFieldError(input, errorDiv, 'CVC must be 3 digits.');
+    return false;
+  } else {
+    clearFieldError(input, errorDiv);
+    return true;
+  }
+}
+['card-number','card-expiry','card-cvc'].forEach(id => {
+  const input = document.getElementById(id);
+  input.addEventListener('blur', () => {
+    if (id === 'card-number') validateCardNumber();
+    if (id === 'card-expiry') validateCardExpiry();
+    if (id === 'card-cvc') validateCardCvc();
+  });
+  input.addEventListener('input', () => {
+    if (id === 'card-number') validateCardNumber();
+    if (id === 'card-expiry') validateCardExpiry();
+    if (id === 'card-cvc') validateCardCvc();
+  });
+});
+
+// Handle checkout form submit
+const checkoutForm = document.getElementById('checkout-form');
+checkoutForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+  if (paymentMethod === 'visa') {
+    const validNumber = validateCardNumber();
+    const validExpiry = validateCardExpiry();
+    const validCvc = validateCardCvc();
+    if (!validNumber || !validExpiry || !validCvc) {
+      const msgDiv = document.getElementById('checkout-message');
+      msgDiv.textContent = 'Please correct the card information.';
+      msgDiv.className = 'alert alert-danger mt-3';
+      msgDiv.style.display = 'block';
+      return;
+    }
+  }
+  const token = localStorage.getItem('token');
+  const address = {
+    street: document.getElementById('street').value,
+    city: document.getElementById('city').value,
+    state: document.getElementById('state').value,
+    country: document.getElementById('country').value
+  };
+  const shippingMethod = document.querySelector('input[name="shippingMethod"]:checked').value;
+  try {
+    // Always send the request, do not block by country
+    const response = await fetch('/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ address, shippingMethod, paymentMethod })
+    });
+    const data = await response.json();
+    const msgDiv = document.getElementById('checkout-message');
+    if (data.success) {
+      msgDiv.textContent = `Order complete! Your order ID is ${data.orderId}`;
+      msgDiv.className = 'alert alert-success mt-3';
+      msgDiv.style.display = 'block';
+      setTimeout(() => { window.location.href = '/user/profile'; }, 2000);
+    } else {
+      msgDiv.textContent = data.message || 'Error placing order.';
+      msgDiv.className = 'alert alert-danger mt-3';
+      msgDiv.style.display = 'block';
+    }
+  } catch (error) {
+    const msgDiv = document.getElementById('checkout-message');
+    msgDiv.textContent = 'Error placing order.';
+    msgDiv.className = 'alert alert-danger mt-3';
+    msgDiv.style.display = 'block';
+  }
+});
+
+loadCheckoutData();
+</script>
+
+<%- include ../partials/footer %>

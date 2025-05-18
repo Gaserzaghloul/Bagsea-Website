@@ -1,0 +1,230 @@
+<%- include ../partials/header %>
+<%- include ../partials/categories-navbar %>
+
+<div class="container">
+  <div class="row">
+    <div class="col-md-8 m-auto">
+      <h1 class="mt-4 mb-4">User Profile</h1>
+      <div id="profile-data">Loading profile...</div>
+      <button onclick="handleLogout()" class="btn btn-danger mt-3">Logout</button>
+      <button id="editProfileBtn" class="btn btn-primary mt-3 ml-2">Edit Profile</button>
+      <hr>
+      <h3>Your Orders</h3>
+      <div id="orders-data">Loading orders...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div class="modal fade" id="editProfileModal" tabindex="-1" role="dialog" aria-labelledby="editProfileModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editProfileModalLabel">Edit Profile</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form id="edit-profile-form" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="firstName">First Name</label>
+              <input type="text" class="form-control" id="firstName" name="firstName">
+            </div>
+            <div class="form-group col-md-6">
+              <label for="lastName">Last Name</label>
+              <input type="text" class="form-control" id="lastName" name="lastName">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" class="form-control" id="phone" name="phone">
+          </div>
+          <div class="form-group">
+            <label for="avatar">Profile Image</label>
+            <input type="file" class="form-control-file" id="avatar" name="avatar" accept="image/*">
+            <img id="avatarPreview" src="#" alt="Profile Image Preview" style="display:none;max-width:80px;border-radius:50%;margin-top:10px;" />
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" class="form-control mb-2" id="street" name="street" placeholder="Street">
+            <input type="text" class="form-control mb-2" id="city" name="city" placeholder="City">
+            <input type="text" class="form-control mb-2" id="state" name="state" placeholder="State">
+            <input type="text" class="form-control mb-2" id="zipCode" name="zipCode" placeholder="Zip Code">
+            <input type="text" class="form-control mb-2" id="country" name="country" placeholder="Country">
+          </div>
+          <div id="profile-update-msg" class="mt-2"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+async function fetchProfile() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = '/user/signin';
+      return;
+    }
+    const response = await fetch('/user/profile/data', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (data.success) {
+      const p = data.user.profile || {};
+      const profileHtml = `
+        <div class="card mb-3">
+          <div class="card-body">
+            <h5 class="card-title">Profile Information</h5>
+            <p class="card-text"><strong>Username:</strong> ${data.user.username}</p>
+            <p class="card-text"><strong>Email:</strong> ${data.user.email}</p>
+            <p class="card-text"><strong>Name:</strong> ${(p.firstName || '') + ' ' + (p.lastName || '')}</p>
+            <p class="card-text"><strong>Phone:</strong> ${p.phone || ''}</p>
+            <p class="card-text"><strong>Address:</strong> ${p.address ? `${p.address.street || ''}, ${p.address.city || ''}, ${p.address.state || ''}, ${p.address.zipCode || ''}, ${p.address.country || ''}` : ''}</p>
+            <p class="card-text"><strong>Profile Image:</strong> ${p.avatar && p.avatar !== '.' ? `<img src='${p.avatar}' alt='profile image' style='max-width:60px;border-radius:50%;'>` : '<span class="text-muted">No profile image</span>'}</p>
+            <p class="card-text"><strong>Joined:</strong> ${new Date(data.user.createdAt).toLocaleString()}</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('profile-data').innerHTML = profileHtml;
+      // Fill form fields for modal
+      document.getElementById('firstName').value = p.firstName || '';
+      document.getElementById('lastName').value = p.lastName || '';
+      document.getElementById('phone').value = p.phone || '';
+      document.getElementById('street').value = p.address ? p.address.street || '' : '';
+      document.getElementById('city').value = p.address ? p.address.city || '' : '';
+      document.getElementById('state').value = p.address ? p.address.state || '' : '';
+      document.getElementById('zipCode').value = p.address ? p.address.zipCode || '' : '';
+      document.getElementById('country').value = p.address ? p.address.country || '' : '';
+      // Avatar preview
+      if (p.avatar) {
+        document.getElementById('avatarPreview').src = p.avatar;
+        document.getElementById('avatarPreview').style.display = 'block';
+      } else {
+        document.getElementById('avatarPreview').style.display = 'none';
+      }
+    } else {
+      document.getElementById('profile-data').innerHTML = 'Error loading profile';
+    }
+  } catch (error) {
+    document.getElementById('profile-data').innerHTML = 'Error loading profile';
+    window.location.href = '/user/signin';
+  }
+}
+
+document.getElementById('editProfileBtn').addEventListener('click', function() {
+  $('#editProfileModal').modal('show');
+});
+
+document.getElementById('avatar').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      document.getElementById('avatarPreview').src = ev.target.result;
+      document.getElementById('avatarPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+document.getElementById('edit-profile-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const token = localStorage.getItem('token');
+  const formData = new FormData();
+  formData.append('firstName', document.getElementById('firstName').value);
+  formData.append('lastName', document.getElementById('lastName').value);
+  formData.append('phone', document.getElementById('phone').value);
+  formData.append('street', document.getElementById('street').value);
+  formData.append('city', document.getElementById('city').value);
+  formData.append('state', document.getElementById('state').value);
+  formData.append('zipCode', document.getElementById('zipCode').value);
+  formData.append('country', document.getElementById('country').value);
+  if (document.getElementById('avatar').files[0]) {
+    formData.append('avatar', document.getElementById('avatar').files[0]);
+  }
+  try {
+    const response = await fetch('/user/profile/update', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+    const data = await response.json();
+    const msgDiv = document.getElementById('profile-update-msg');
+    if (data.success) {
+      msgDiv.innerHTML = `<div class='alert alert-success'>${data.message}</div>`;
+      fetchProfile();
+      setTimeout(() => { $('#editProfileModal').modal('hide'); }, 1200);
+    } else {
+      msgDiv.innerHTML = `<div class='alert alert-danger'>${data.message}</div>`;
+    }
+  } catch (error) {
+    document.getElementById('profile-update-msg').innerHTML = `<div class='alert alert-danger'>Error updating profile.</div>`;
+  }
+});
+
+async function fetchOrders() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const response = await fetch('/user/orders', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (data.success && data.orders.length > 0) {
+      let html = '';
+      data.orders.forEach(order => {
+        html += `<div class="card mb-3"><div class="card-body">
+          <h5>Order ID: ${order._id}</h5>
+          <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleString()}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+          <p><strong>Total:</strong> $${order.totalAmount.toFixed(2)}</p>
+          <ul>`;
+        order.cart.items.forEach(item => {
+          html += `<li>${item.title} x ${item.qty} ($${item.price.toFixed(2)})</li>`;
+        });
+        html += `</ul>`;
+        if(order.statusHistory && order.statusHistory.length > 0) {
+          html += `<p><strong>Status History:</strong></p><ul>`;
+          order.statusHistory.forEach(hist => {
+            html += `<li>${hist.status} at ${new Date(hist.date).toLocaleString()} ${hist.note ? '('+hist.note+')' : ''}</li>`;
+          });
+          html += `</ul>`;
+        }
+        if(order.trackingUpdates && order.trackingUpdates.length > 0) {
+          html += `<p><strong>Tracking Updates:</strong></p><ul>`;
+          order.trackingUpdates.forEach(track => {
+            html += `<li>${track.status} - ${track.location} at ${new Date(track.date).toLocaleString()} ${track.description ? '('+track.description+')' : ''}</li>`;
+          });
+          html += `</ul>`;
+        }
+        html += `</div></div>`;
+      });
+      document.getElementById('orders-data').innerHTML = html;
+    } else {
+      document.getElementById('orders-data').innerHTML = '<div class="alert alert-info">No orders found.</div>';
+    }
+  } catch (error) {
+    document.getElementById('orders-data').innerHTML = 'Error loading orders.';
+  }
+}
+
+async function handleLogout() {
+  localStorage.removeItem('token');
+  window.location.href = '/user/signin';
+}
+
+fetchProfile();
+fetchOrders();
+</script>
+
+<%- include ../partials/footer %>
