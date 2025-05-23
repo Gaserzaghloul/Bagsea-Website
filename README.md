@@ -4,6 +4,8 @@ Bagséa is a complete E-Commerce platform for selling bags including backpacks, 
 
 ---
 
+<img width="1431" alt="3" src="https://github.com/user-attachments/assets/2b89b279-b44b-4ae1-9dff-c7269f6d67d4" />
+
 ## 📦 Features
 
 - 👤 **User Authentication** (JWT + bcrypt)
